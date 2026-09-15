@@ -18,7 +18,12 @@ export function createMemoryUserRepository(): UserRepository {
       return users.get(id) ?? null;
     },
 
+    async findByIds(ids) {
+      return ids.map((id) => users.get(id)).filter((user): user is User => user !== undefined);
+    },
+
     async create(input: NewUser) {
+      const now = new Date().toISOString();
       const user: User = {
         id: randomUUID(),
         email: input.email.toLowerCase(),
@@ -28,10 +33,22 @@ export function createMemoryUserRepository(): UserRepository {
         siret: input.siret ?? null,
         prenom: input.prenom ?? null,
         nom: input.nom ?? null,
-        createdAt: new Date().toISOString(),
+        telephone: input.telephone ?? null,
+        isActive: true,
+        mustChangePassword: input.mustChangePassword ?? false,
+        createdAt: now,
+        updatedAt: now,
       };
       users.set(user.id, user);
       return user;
+    },
+
+    async update(id, patch) {
+      const current = users.get(id);
+      if (!current) throw new Error(`Utilisateur introuvable : ${id}`);
+      const updated: User = { ...current, ...patch, updatedAt: new Date().toISOString() };
+      users.set(id, updated);
+      return updated;
     },
   };
 }

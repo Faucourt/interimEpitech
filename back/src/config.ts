@@ -19,4 +19,12 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
   supabaseUrl: process.env.SUPABASE_URL ?? '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  // Intégration n8n (contrat : n8n/README.md). Les deux sont optionnelles : sans URL, la
+  // notification sortante est désactivée ; sans clé, la route interne répond 503.
+  n8nWebhookUrl: process.env.N8N_WEBHOOK_URL ?? '',
+  n8nApiKey: process.env.N8N_API_KEY ?? '',
+  // Base non relationnelle (logs de matching, voir src/mongo.ts). Optionnelle : sans URI, la
+  // journalisation est désactivée et l'API fonctionne normalement.
+  mongodbUri: process.env.MONGODB_URI ?? '',
+  mongodbDb: process.env.MONGODB_DB ?? 'cleanmatch',
 };

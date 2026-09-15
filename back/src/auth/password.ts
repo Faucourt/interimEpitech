@@ -1,4 +1,5 @@
 import argon2 from 'argon2';
+import { randomBytes } from 'node:crypto';
 
 /**
  * argon2id : variante recommandée par l'OWASP pour le stockage de mots de passe.
@@ -16,4 +17,12 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
     // Hash malformé en base : on refuse plutôt que de laisser remonter une exception.
     return false;
   }
+}
+
+/**
+ * Mot de passe temporaire remis à une entreprise à la création de son compte par l'admin.
+ * 9 octets aléatoires → 12 caractères base64url, lisibles et sans caractère ambigu à copier.
+ */
+export function generateTemporaryPassword(): string {
+  return randomBytes(9).toString('base64url');
 }
