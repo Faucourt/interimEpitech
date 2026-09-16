@@ -17,13 +17,15 @@ const styles: Record<StatusTone, string> = {
 export function Badge({
   children,
   tone = "neutral",
+  className = "",
 }: {
   children: ReactNode;
   tone?: StatusTone;
+  className?: string;
 }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${styles[tone]}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${styles[tone]} ${className}`}
     >
       {children}
     </span>
