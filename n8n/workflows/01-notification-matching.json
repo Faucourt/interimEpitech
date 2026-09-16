@@ -1,0 +1,172 @@
+{
+  "name": "CleanMatch — 01 Notification de matching",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Notification de matching\n\nDéclenché par le backend CleanMatch à la **publication d'une mission** : il envoie la mission et les agents dont le score de compatibilité dépasse **70/100**.\n\nPour chaque agent, un message est posté sur le salon Discord (credential **CleanMatch Discord**).\n\nLe webhook est protégé par le header `X-Api-Key` (credential **CleanMatch API Key**).\n\nContrat du payload : `n8n/README.md`.",
+        "height": 300,
+        "width": 520,
+        "color": 4
+      },
+      "id": "faaa9cfc-65a8-4dd3-8c43-901a30024e38",
+      "name": "À propos",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cleanmatch/mission-publiee",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "36064996-72ef-47df-af90-1aeb9b4a4d3a",
+      "name": "Webhook mission publiée",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "5de4c2dd-d421-43f6-911e-986d576e1d26",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "CleanMatch API Key"
+        }
+      },
+      "notes": "POST /webhook/cleanmatch/mission-publiee — répond 200 immédiatement, le backend n'attend pas l'envoi Discord.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reçoit le payload envoyé par le backend CleanMatch à la publication d'une mission\n// (contrat détaillé dans n8n/README.md) et produit UN item par agent à notifier,\n// avec le message Discord déjà formaté.\nconst SEUIL_SCORE = 70; // strictement supérieur, cf. cahier des charges\n\nconst entree = $input.first().json;\nconst payload = entree.body ?? entree; // le nœud Webhook (v2) range le corps dans \"body\"\nconst mission = payload.mission;\nconst agents = Array.isArray(payload.agents) ? payload.agents : [];\n\nif (!mission || !mission.id || !mission.intitule) {\n  throw new Error('Payload invalide : \"mission.id\" et \"mission.intitule\" sont obligatoires (voir n8n/README.md)');\n}\n\n// \"2026-09-21\" ou ISO complet -> \"21/09/2026\" (en UTC pour ne pas décaler les dates sans heure)\nfunction formatDate(valeur) {\n  if (!valeur) return '?';\n  const d = new Date(valeur);\n  if (Number.isNaN(d.getTime())) return String(valeur);\n  const jj = String(d.getUTCDate()).padStart(2, '0');\n  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');\n  return `${jj}/${mm}/${d.getUTCFullYear()}`;\n}\n\nconst lieu = [mission.ville, mission.codePostal ? `(${mission.codePostal})` : ''].filter(Boolean).join(' ') || 'lieu non précisé';\nconst dates = `du ${formatDate(mission.dateDebut)} au ${formatDate(mission.dateFin)}`;\nconst creneau = mission.creneau || 'non précisé';\nconst remuneration = mission.remuneration != null\n  ? `${Number(mission.remuneration).toFixed(2).replace('.', ',')} €/h brut`\n  : 'non précisée';\n\nconst items = [];\nfor (const agent of agents) {\n  const score = Number(agent.score);\n  if (!Number.isFinite(score) || score <= SEUIL_SCORE) continue;\n\n  // On n'affiche jamais l'e-mail dans le salon Discord (donnée personnelle) : prénom + nom suffisent.\n  const nomAgent = [agent.prenom, agent.nom].filter(Boolean).join(' ') || 'Agent';\n\n  const lignes = [\n    `**Nouvelle mission pour ${nomAgent}** — compatibilité **${Math.round(score)}/100**`,\n    `> **${mission.intitule}** — ${lieu}`,\n    `> Dates : ${dates} · Créneau : ${creneau}`,\n    `> Rémunération : ${remuneration}`,\n  ];\n  if (mission.url) lignes.push(`> Voir la mission : ${mission.url}`);\n  lignes.push(`Mission n° ${mission.id} — postulez depuis votre espace CleanMatch.`);\n\n  items.push({\n    json: {\n      missionId: mission.id,\n      agentId: agent.id ?? null,\n      score,\n      message: lignes.join('\\n'),\n    },\n  });\n}\n\n// Aucun agent au-dessus du seuil : on ne renvoie rien, la suite du workflow ne s'exécute pas.\nreturn items;\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "d9539f59-12a6-4ab8-9af1-6e15f0b84799",
+      "name": "Préparer les notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "notes": "Filtre score > 70 et formate un message par agent.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "6c1a7414-6b62-416f-a61b-f199963e581e",
+      "name": "Boucle sur les agents",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "332c1ee9-35d3-49e5-ad09-ed0e07e2b162",
+      "name": "Envoyer sur Discord",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        720,
+        120
+      ],
+      "credentials": {
+        "discordWebhookApi": {
+          "id": null,
+          "name": "CleanMatch Discord"
+        }
+      },
+      "notes": "Un message Discord par agent notifié.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "a7efa8a9-9094-40b9-bbf8-f3a4881a8e60",
+      "name": "Terminé",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -120
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook mission publiée": {
+      "main": [
+        [
+          {
+            "node": "Préparer les notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les notifications": {
+      "main": [
+        [
+          {
+            "node": "Boucle sur les agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Boucle sur les agents": {
+      "main": [
+        [
+          {
+            "node": "Terminé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envoyer sur Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer sur Discord": {
+      "main": [
+        [
+          {
+            "node": "Boucle sur les agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}
