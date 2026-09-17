@@ -10,13 +10,11 @@ utilisées par le produit. Chaque commande accepte `--dry-run` pour tout faire s
 | `france-travail` | [API Offres d'emploi v2](https://francetravail.io/data/api/offres-emploi) (OAuth2) | `donnees_france_travail` | tableau de tendances marché (espace admin) |
 
 ## Installation et commandes
-
 ```bash
 cd data
 npm install
 npm run dev -- --help                 # aide générale
 npm run dev -- communes --help        # aide d'une commande
-
 npm test                              # tests unitaires du nettoyage (vitest)
 npm run typecheck                     # tsc --noEmit
 npm run build                         # compile dans dist/
