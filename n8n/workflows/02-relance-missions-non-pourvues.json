@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Relance des missions non pourvues\n\nTous les jours à **9h (Europe/Paris)**, interroge l'API CleanMatch pour lister les missions encore **OUVERTE depuis plus de 3 jours sans candidature acceptée**, puis poste une **relance groupée** sur Discord (une ligne par mission).\n\nÀ configurer : variable d'environnement `CLEANMATCH_API_URL`, credentials **CleanMatch API Key** et **CleanMatch Discord**.\n\nContrat de l'API : `n8n/README.md`.",
+        "content": "## Relance des missions non pourvues\n\nTous les jours à **9h (Europe/Paris)**, interroge l'API CleanMatch pour lister les missions encore **OUVERTE depuis plus de 3 jours sans candidature acceptée**, puis poste une **relance groupée** sur Discord (une ligne par mission).\n\nÀ configurer : variable d'environnement `CLEANMATCH_API_URL`, credentials **CleanMatch API Key** et **CleanMatch Discord**.\n\nContrat de l'API : `README.md` (section Automatisations n8n).",
         "height": 300,
         "width": 520,
         "color": 4

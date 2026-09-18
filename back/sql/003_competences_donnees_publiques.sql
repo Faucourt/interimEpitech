@@ -41,12 +41,7 @@ create table if not exists public.donnees_france_travail (
 create index if not exists donnees_ft_rome_annee_idx
   on public.donnees_france_travail (code_rome, annee);
 
--- 4. RLS, comme sur toutes les autres tables.
-alter table public.competences              enable row level security;
-alter table public.interimaire_competences  enable row level security;
-alter table public.donnees_france_travail   enable row level security;
-
--- 5. Référentiel initial : les compétences citées au §3.2 du cahier des charges.
+-- 4. Référentiel initial : les compétences citées au §3.2 du cahier des charges.
 insert into public.competences (nom) values
   ('vitrerie'), ('nettoyage industriel'), ('autolaveuse'), ('désinfection'),
   ('remise en état'), ('nettoyage de bureaux'), ('parties communes'), ('propreté urbaine')

@@ -9,7 +9,7 @@ const program = new Command();
 program
   .name('cleanmatch-data')
   .description(
-    'Import et nettoyage des données publiques de CleanMatch vers Supabase.\n' +
+    'Import et nettoyage des données publiques de CleanMatch vers PostgreSQL.\n' +
       'Chaque commande récupère une source ouverte, la nettoie (libellés, doublons, dates, lieux)\n' +
       'puis alimente une table utilisée par le produit. Ajouter --dry-run pour ne rien écrire.',
   )

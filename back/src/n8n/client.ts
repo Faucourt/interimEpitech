@@ -8,7 +8,7 @@ export const NOTIFICATION_SCORE_THRESHOLD = 70;
 /** Délai maximal accordé à n8n : la mission est déjà créée, inutile d'attendre plus longtemps. */
 const TIMEOUT_MS = 3000;
 
-/** Payload du webhook « mission publiée » (workflow 1), contrat défini dans n8n/README.md. */
+/** Payload du webhook « mission publiée » (workflow 1), contrat défini dans README.md (section « Automatisations n8n »). */
 export interface MissionPublishedPayload {
   mission: {
     id: string;

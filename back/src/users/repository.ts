@@ -16,7 +16,7 @@ export type UserPatch = Partial<Pick<User, 'passwordHash' | 'mustChangePassword'
 
 /**
  * Toute la persistance passe par cette interface. Le reste du code ne connaît
- * pas Supabase : c'est ce qui permet de tester l'API sans base de données.
+ * pas PostgreSQL : c'est ce qui permet de tester l'API sans base de données.
  */
 export interface UserRepository {
   findByEmail(email: string): Promise<User | null>;

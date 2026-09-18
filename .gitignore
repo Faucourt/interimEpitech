@@ -34,7 +34,3 @@ coverage/
 
 # n8n (données locales : credentials chiffrées + clé de chiffrement)
 .n8n/
-
-# Supabase CLI
-supabase/.temp/
-supabase/.branches/

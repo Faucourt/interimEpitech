@@ -1,5 +1,5 @@
+import { createPool, upsertInBatches } from '../db';
 import { log, n } from '../format';
-import { createSupabase, upsertInBatches } from '../supabase';
 import { cleanCommunes, type CommuneRow, type RejectReason } from './clean';
 import { fetchArrondissements, fetchCommunes } from './fetch';
 
@@ -60,28 +60,28 @@ export async function runCommunes(options: CommunesOptions): Promise<void> {
     return;
   }
 
-  const supabase = createSupabase();
-  log(`Écriture dans ${TABLE} : ${n(batches)} lots de ${n(BATCH_SIZE)}, upsert sur code_postal + nom…`);
-  const written = await upsertInBatches(supabase, TABLE, report.rows, 'code_postal,nom', {
-    batchSize: BATCH_SIZE,
-    onBatch: (done, total) => {
-      const batch = Math.ceil(done / BATCH_SIZE);
-      if (batch % 10 === 0 || done === total) log(`  lot ${batch}/${batches} — ${n(done)}/${n(total)} lignes`);
-    },
-  });
-  log(`  ${n(written)} lignes écrites. Import rejouable : relancer ne crée pas de doublon.`);
+  const pool = createPool();
+  try {
+    log(`Écriture dans ${TABLE} : ${n(batches)} lots de ${n(BATCH_SIZE)}, upsert sur code_postal + nom…`);
+    const written = await upsertInBatches(pool, TABLE, report.rows, ['code_postal', 'nom'], {
+      batchSize: BATCH_SIZE,
+      onBatch: (done, total) => {
+        const batch = Math.ceil(done / BATCH_SIZE);
+        if (batch % 10 === 0 || done === total) log(`  lot ${batch}/${batches} — ${n(done)}/${n(total)} lignes`);
+      },
+    });
+    log(`  ${n(written)} lignes écrites. Import rejouable : relancer ne crée pas de doublon.`);
 
-  // Relecture avec la requête exacte du back (première commune du code postal, ordre alphabétique).
-  const { count, error: countError } = await supabase.from(TABLE).select('*', { count: 'exact', head: true });
-  if (countError) throw new Error(`Comptage de ${TABLE} : ${countError.message}`);
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('code_postal, nom, latitude, longitude')
-    .eq('code_postal', CONTROL_CODE_POSTAL)
-    .order('nom')
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Relecture de ${CONTROL_CODE_POSTAL} : ${error.message}`);
-  const found = data ? describe(data as CommuneRow) : 'introuvable';
-  log(`Vérification en base : ${n(count ?? 0)} lignes dans ${TABLE} ; ${CONTROL_CODE_POSTAL} → ${found}`);
+    // Relecture avec la requête exacte du back (première commune du code postal, ordre alphabétique).
+    const { rows: [{ count }] } = await pool.query<{ count: number }>(`select count(*)::int as count from ${TABLE}`);
+    const { rows: [found] } = await pool.query<CommuneRow>(
+      `select code_postal, nom, latitude, longitude from ${TABLE} where code_postal = $1 order by nom limit 1`,
+      [CONTROL_CODE_POSTAL],
+    );
+    log(
+      `Vérification en base : ${n(count)} lignes dans ${TABLE} ; ${CONTROL_CODE_POSTAL} → ${found ? describe(found) : 'introuvable'}`,
+    );
+  } finally {
+    await pool.end();
+  }
 }

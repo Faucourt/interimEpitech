@@ -11,7 +11,7 @@ const nonPourvuesQuerySchema = z.object({
 });
 
 /**
- * Routes internes consommées par les workflows n8n (contrat : n8n/README.md).
+ * Routes internes consommées par les workflows n8n (contrat : README.md, section « Automatisations n8n »).
  * Protégées par la clé d'API partagée, jamais par le JWT des utilisateurs.
  */
 export function createInternalRouter(repos: Repositories): Router {

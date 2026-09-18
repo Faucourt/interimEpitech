@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Pool } from 'pg';
 import type { TendanceMarche } from '../types';
 import type { TendanceRepository } from './repository';
 
@@ -28,14 +28,26 @@ function toTendance(row: TendanceRow): TendanceMarche {
   };
 }
 
-export function createSupabaseTendanceRepository(supabase: SupabaseClient): TendanceRepository {
+export function createPgTendanceRepository(pool: Pool): TendanceRepository {
   return {
     async list(filters) {
-      let query = supabase.from('donnees_france_travail').select('*');
-      if (filters.annee !== undefined) query = query.eq('annee', filters.annee);
-      if (filters.codeRome !== undefined) query = query.eq('code_rome', filters.codeRome);
-      const { data } = await query.order('projets_recrutement', { ascending: false, nullsFirst: false });
-      return ((data ?? []) as TendanceRow[]).map(toTendance);
+      const where: string[] = [];
+      const values: unknown[] = [];
+      if (filters.annee !== undefined) {
+        values.push(filters.annee);
+        where.push(`annee = $${values.length}`);
+      }
+      if (filters.codeRome !== undefined) {
+        values.push(filters.codeRome);
+        where.push(`code_rome = $${values.length}`);
+      }
+      const { rows } = await pool.query<TendanceRow>(
+        `select * from donnees_france_travail
+         ${where.length > 0 ? `where ${where.join(' and ')}` : ''}
+         order by projets_recrutement desc nulls last`,
+        values,
+      );
+      return rows.map(toTendance);
     },
   };
 }

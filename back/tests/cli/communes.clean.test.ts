@@ -1,5 +1,5 @@
 /**
- * Tests du nettoyage des communes (geo.api.gouv.fr) : fonctions pures de src/communes/clean.ts.
+ * Tests du nettoyage des communes (geo.api.gouv.fr) : fonctions pures de src/cli/communes/clean.ts.
  * Les fixtures reprennent la forme exacte renvoyée par l'API avec `fields=nom,codesPostaux,centre`.
  */
 import { describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ import {
   parentCityName,
   type CommuneRow,
   type RawCommune,
-} from '../src/communes/clean';
+} from '../../src/cli/communes/clean';
 
 // Réponses réelles de l'API (septembre 2025), tronquées aux champs utiles.
 const PARIS: RawCommune = {

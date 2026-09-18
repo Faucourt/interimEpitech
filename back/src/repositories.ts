@@ -7,7 +7,7 @@ import type { ProfileRepository } from './profils/repository';
 import type { TendanceRepository } from './tendances/repository';
 import type { UserRepository } from './users/repository';
 
-/** Ensemble des dépôts injectés dans l'application : Supabase (et MongoDB pour les logs) en prod, mémoire en test. */
+/** Ensemble des dépôts injectés dans l'application : PostgreSQL (et MongoDB pour les logs) en prod, mémoire en test. */
 export interface Repositories {
   users: UserRepository;
   profiles: ProfileRepository;

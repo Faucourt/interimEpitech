@@ -17,9 +17,10 @@ export const config = {
   // En dev et en prod, l'absence de JWT_SECRET fait volontairement planter le démarrage.
   jwtSecret: process.env.JWT_SECRET ?? (isTest ? 'test-secret' : required('JWT_SECRET')),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
-  supabaseUrl: process.env.SUPABASE_URL ?? '',
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
-  // Intégration n8n (contrat : n8n/README.md). Les deux sont optionnelles : sans URL, la
+  // Base relationnelle (PostgreSQL, voir src/db/pool.ts). Obligatoire hors test : en test, les dépôts
+  // mémoire remplacent la base et aucune connexion n'est ouverte.
+  databaseUrl: process.env.DATABASE_URL ?? (isTest ? 'postgres://test' : required('DATABASE_URL')),
+  // Intégration n8n (contrat : README.md, section « Automatisations n8n »). Les deux sont optionnelles : sans URL, la
   // notification sortante est désactivée ; sans clé, la route interne répond 503.
   n8nWebhookUrl: process.env.N8N_WEBHOOK_URL ?? '',
   n8nApiKey: process.env.N8N_API_KEY ?? '',

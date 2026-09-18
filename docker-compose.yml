@@ -1,0 +1,25 @@
+# Base relationnelle de CleanMatch (PostgreSQL), en local pour chaque développeur.
+#   docker compose up -d        démarre la base (données conservées dans le volume `pgdata`)
+#   docker compose down         l'arrête (ajouter -v pour tout effacer)
+# Identifiants de développement uniquement : le port n'est ouvert que sur la machine (127.0.0.1).
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cleanmatch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cleanmatch
+      POSTGRES_PASSWORD: cleanmatch
+      POSTGRES_DB: cleanmatch
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cleanmatch -d cleanmatch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

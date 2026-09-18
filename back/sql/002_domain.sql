@@ -109,10 +109,3 @@ create table if not exists public.communes (
   primary key (code_postal, nom)
 );
 create index if not exists communes_cp_idx on public.communes (code_postal);
-
--- 7. RLS activée partout, sans policy : seul le back (clé secrète) accède aux données.
-alter table public.interimaire_profiles enable row level security;
-alter table public.experiences          enable row level security;
-alter table public.missions             enable row level security;
-alter table public.candidatures         enable row level security;
-alter table public.communes             enable row level security;

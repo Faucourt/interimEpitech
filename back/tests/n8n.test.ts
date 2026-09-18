@@ -1,5 +1,5 @@
 /**
- * Intégration n8n (contrat : n8n/README.md) : la route interne des missions non pourvues
+ * Intégration n8n (contrat : README.md, section « Automatisations n8n ») : la route interne des missions non pourvues
  * (workflow 2) et le webhook sortant à la publication d'une mission (workflow 1).
  * Aucun appel réseau réel : `fetch` est remplacé par un mock.
  */

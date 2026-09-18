@@ -1,5 +1,5 @@
 /**
- * Tests du nettoyage des offres France Travail : fonctions pures de src/franceTravail/clean.ts.
+ * Tests du nettoyage des offres France Travail : fonctions pures de src/cli/franceTravail/clean.ts.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -15,7 +15,7 @@ import {
   resolveDepartement,
   type CleanOffer,
   type RawOffre,
-} from '../src/franceTravail/clean';
+} from '../../src/cli/franceTravail/clean';
 
 // Offre minimale valide, forme de /offres/search.
 const RAW: RawOffre = {

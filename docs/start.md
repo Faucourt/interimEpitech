@@ -5,24 +5,25 @@ bloc doit être lancé** — voir le journal en bas de page.
 
 ## Vue d'ensemble
 
-Quatre briques, dont trois à lancer en local :
+Tout tourne en local, sur chaque poste :
 
 | Brique | Où | À lancer ? | Port |
 | --- | --- | --- | --- |
 | **Frontend** | `front/` | oui | 5173 |
 | **Backend** | `back/` | oui | 3000 |
 | **n8n** | global | oui, pour les automatisations | 5678 |
+| **PostgreSQL** | Docker (`docker-compose.yml`) | oui | 5432 |
 | **MongoDB** | local | oui, pour les logs de matching | 27017 |
-| **Supabase** | cloud, partagé par l'équipe | non, déjà en ligne | — |
-| **CLI données** | `data/` | non, ponctuel | — |
+| **CLI données** | `back/src/cli/` | non, ponctuel | — |
 
-La base de données est **commune aux 4** : personne n'a de Postgres local à installer, et le
-schéma est déjà appliqué. Il faut seulement les clés d'accès.
+Chacun a **sa propre base PostgreSQL**, dans un conteneur Docker. Elle se crée en quatre
+commandes (section 2 bis) : tables, compte admin, communes.
 
 ## Prérequis
 
 - Node.js 20 ou plus (`node -v`)
 - npm
+- Docker (Docker Desktop ou OrbStack), lancé
 - Un compte Discord avec accès au serveur de l'équipe (pour n8n uniquement)
 
 ---
@@ -35,7 +36,6 @@ cd interimEpitech
 
 cd front && npm install && cd ..
 cd back  && npm install && cd ..
-cd data  && npm install && cd ..
 ```
 
 ## 2. Configuration
@@ -50,8 +50,9 @@ Puis renseigner :
 
 | Variable | Valeur | Où la trouver |
 | --- | --- | --- |
-| `SUPABASE_URL` | `https://lfvhofjksqtcyardlfja.supabase.co` | déjà dans `.env.example` |
-| `SUPABASE_SERVICE_ROLE_KEY` | clé `sb_secret_…` | dashboard Supabase → Settings → API, **ou demander à l'équipe** |
+| `DATABASE_URL` | `postgres://cleanmatch:cleanmatch@localhost:5432/cleanmatch` | déjà dans `.env.example` (base Docker locale) |
+| `ADMIN_EMAIL` | `admin@cleanmatch.fr` | compte créé par `npm run db:seed` |
+| `ADMIN_PASSWORD` | au choix | vide = généré et affiché une seule fois par le seed |
 | `JWT_SECRET` | une chaîne aléatoire longue | à générer, propre à chaque poste |
 | `JWT_EXPIRES_IN` | `24h` | — |
 | `PORT` | `3000` | — |
@@ -60,6 +61,7 @@ Puis renseigner :
 | `N8N_API_KEY` | une chaîne aléatoire | **la même** que dans la credential n8n |
 | `MONGODB_URI` | `mongodb://127.0.0.1:27017` | après installation de MongoDB |
 | `MONGODB_DB` | `cleanmatch` | — |
+| `FRANCE_TRAVAIL_CLIENT_ID` / `_SECRET` | vides par défaut | [francetravail.io](https://francetravail.io), pour le CLI uniquement |
 
 Générer un secret :
 
@@ -67,19 +69,33 @@ Générer un secret :
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-> ⚠️ La clé `service_role` donne un accès total à la base et contourne le RLS. Elle ne va
-> **que** dans `back/.env`. Jamais dans `front/`, jamais dans un commit : Vite publie toute
-> variable `VITE_*` dans le bundle envoyé au navigateur.
+> ⚠️ Les secrets (`JWT_SECRET`, `N8N_API_KEY`, identifiants France Travail) ne vont **que**
+> dans `back/.env`. Jamais dans `front/`, jamais dans un commit : Vite publie toute variable
+> `VITE_*` dans le bundle envoyé au navigateur.
 
 **Sans n8n**, laisser `N8N_WEBHOOK_URL` vide : les notifications sont alors désactivées
 silencieusement et le reste de l'application fonctionne normalement. Idem pour `MONGODB_URI` :
 vide, la journalisation des scores est désactivée sans rien casser.
 
+## 2 bis. Base de données (une seule fois)
+
+Depuis la racine du dépôt, Docker lancé :
+
+```bash
+docker compose up -d                    # démarre PostgreSQL (port 5432)
+cd back
+npm run db:migrate                      # crée les tables (fichiers back/sql/)
+npm run db:seed                         # crée le compte ADMIN (ADMIN_EMAIL / ADMIN_PASSWORD)
+npm run import:communes                 # ~39 000 communes, pour le critère de distance
+```
+
+Les données sont conservées dans un volume Docker : un redémarrage de la machine ne perd rien.
+
 ---
 
 ## 3. Lancement quotidien
 
-Trois terminaux :
+Docker lancé, la base redémarre toute seule (sinon `docker compose up -d`). Puis :
 
 ```bash
 # Terminal 1 — backend, http://localhost:3000
@@ -205,7 +221,7 @@ L'interface `http://localhost:5678` permet de voir les exécutions et leurs erre
 ## 4 bis. MongoDB — installation (une seule fois par poste)
 
 MongoDB porte les **logs de matching** : c'est la base non relationnelle exigée par le sujet,
-en complément de Supabase.
+en complément de PostgreSQL.
 
 Homebrew échoue sur les postes dont les Command Line Tools sont anciens. La méthode qui marche
 dans tous les cas est le binaire officiel, sans compilation :
@@ -237,20 +253,19 @@ MONGODB_DB=cleanmatch
 
 ---
 
-## 4 ter. Import des données publiques (ponctuel, déjà fait)
+## 4 ter. Import des données publiques
 
-Le CLI `data/` remplit les tables alimentées par les sources publiques. **L'import des communes
-a déjà été exécuté** sur la base partagée : 35 493 lignes, inutile de le refaire.
-
-À relancer seulement si la table `communes` est vide :
+Le CLI (`back/src/cli/`) remplit les tables alimentées par les sources publiques. L'import des
+communes fait partie de l'initialisation de la base (section 2 bis) ; à relancer seulement si la
+table `communes` est vide :
 
 ```bash
-cd data
-npm run dev -- communes --dry-run   # simule, n'écrit rien
-npm run dev -- communes             # importe réellement
+cd back
+npm run import:communes -- --dry-run   # simule, n'écrit rien
+npm run import:communes                # importe réellement
 ```
 
-Il lit `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` depuis `back/.env`.
+Il fait partie du backend : même `npm install`, même `back/.env` que l'API.
 
 Ces coordonnées servent au **critère de localisation du matching** (25 points sur 100). Sans
 elles, ce critère ne fonctionne pas.
@@ -258,7 +273,7 @@ elles, ce critère ne fonctionne pas.
 La commande `france-travail` exige des identifiants OAuth à demander sur
 [francetravail.io](https://francetravail.io) (`FRANCE_TRAVAIL_CLIENT_ID` et
 `FRANCE_TRAVAIL_CLIENT_SECRET`). Sans eux, elle s'arrête avec la marche à suivre.
-Voir `data/README.md`.
+Voir le `README.md`, section « Données publiques — CLI ».
 
 ---
 
@@ -266,24 +281,21 @@ Voir `data/README.md`.
 
 ```bash
 cd back
-npm test              # unitaires + fonctionnels — 101 tests
+npm test              # unitaires + fonctionnels, nettoyage des données publiques inclus — 139 tests
 npm run test:coverage # rapport de couverture — livrable noté
 npm run lint
 npm run build
-
-cd ../data
-npm test              # nettoyage des données publiques — 38 tests
 ```
 
-Les tests **ne nécessitent ni Supabase, ni n8n, ni configuration** : la persistance passe par
+Les tests **ne nécessitent ni base de données, ni n8n, ni configuration** : la persistance passe par
 une implémentation en mémoire et les appels réseau sont mockés.
 
 ---
 
 ## 6. Base de données
 
-Le schéma est déjà appliqué sur le projet Supabase partagé. Les fichiers de `back/sql/` sont
-la **trace versionnée** de ce qui a été exécuté :
+Le schéma vit dans `back/sql/`. `npm run db:migrate` applique dans l'ordre les fichiers pas
+encore passés et les note dans la table `schema_migrations` : le relancer ne refait rien.
 
 | Fichier | Contenu |
 | --- | --- |
@@ -292,13 +304,22 @@ la **trace versionnée** de ce qui a été exécuté :
 | `003_competences_donnees_publiques.sql` | compétences qualifiées, données France Travail |
 
 **Règle d'équipe** : toute évolution du schéma passe par un nouveau fichier `00X_*.sql`
-commité, jamais par une modification à la main dans le dashboard — sinon plus personne ne
-sait dans quel état est la base.
+commité, jamais par une modification à la main — sinon les 4 bases divergent. Après un pull
+qui ajoute un fichier : `npm run db:migrate`.
+
+Repartir d'une base vide :
+
+```bash
+docker compose down -v && docker compose up -d
+cd back && npm run db:migrate && npm run db:seed && npm run import:communes
+```
+
+Consulter la base : `docker exec -it cleanmatch-postgres psql -U cleanmatch`.
 
 ## 7. Comptes de démonstration
 
-Deux comptes existent en base : un **administrateur** et une **entreprise**
-(PropreTech Services). Les mots de passe ne sont pas écrits ici : demander à l'équipe.
+Le compte **administrateur** est créé par `npm run db:seed`, avec `ADMIN_EMAIL` et
+`ADMIN_PASSWORD` de `back/.env`.
 
 Les comptes **intérimaires** se créent librement via `POST /api/auth/register`.
 Les comptes **entreprise** ne peuvent être créés que par l'admin, via
@@ -310,7 +331,10 @@ Les comptes **entreprise** ne peuvent être créés que par l'admin, via
 
 | Symptôme | Cause probable |
 | --- | --- |
-| Le back refuse de démarrer | `JWT_SECRET` absent de `back/.env` — c'est volontaire |
+| Le back refuse de démarrer | `JWT_SECRET` ou `DATABASE_URL` absent de `back/.env` — c'est volontaire |
+| `ECONNREFUSED 127.0.0.1:5432` | PostgreSQL arrêté : lancer Docker, puis `docker compose up -d` |
+| `relation "users" does not exist` | tables pas créées : `cd back && npm run db:migrate` |
+| Connexion admin refusée | `npm run db:seed` pas lancé, ou mot de passe différent de `ADMIN_PASSWORD` |
 | `401` sur toutes les routes protégées | token absent, expiré, ou `JWT_SECRET` différent de celui qui a signé |
 | Webhook n8n en `404` | workflow non **activé**, ou n8n redémarré sans l'activation |
 | Webhook n8n en `403` | en-tête `X-Api-Key` absent ou différent de la credential |
@@ -328,5 +352,7 @@ Les comptes **entreprise** ne peuvent être créés que par l'admin, via
 | 2026-09-15 | Création du document : front, back, n8n, Supabase, tests |
 | 2026-09-15 | Ajout de **MongoDB** (logs de matching, base non relationnelle) |
 | 2026-09-15 | Ajout du **CLI `data/`** et import des 35 493 communes |
+| 2026-09-18 | CLI déplacé dans **`back/src/cli/`** : plus de dossier `data/` ni de second `.env` |
+| 2026-09-18 | **Supabase remplacé par PostgreSQL en Docker** : `docker compose up -d`, `db:migrate`, `db:seed` |
 
 > **À faire évoluer** dès qu'une nouvelle brique doit être lancée.

@@ -1,6 +1,6 @@
 import { ConfigError, config } from '../config';
+import { createPool, upsertInBatches } from '../db';
 import { log, n, pct } from '../format';
-import { createSupabase, upsertInBatches } from '../supabase';
 import { cleanOffers, HARD_TO_FILL_AFTER_DAYS, type OfferRejectReason, type TendanceRow } from './clean';
 import { fetchAccessToken, fetchOffers } from './fetch';
 
@@ -22,9 +22,9 @@ const MISSING_CREDENTIALS =
   '  1. Créer un compte sur https://francetravail.io\n' +
   '  2. Menu « Mes applications » → « Créer une application » (nom libre, ex. CleanMatch)\n' +
   "  3. Dans l'application, onglet « Catalogue » → souscrire à l'API « Offres d'emploi v2 »\n" +
-  "  4. Copier l'identifiant client et la clé secrète dans data/.env (modèle : data/.env.example)\n" +
+  "  4. Copier l'identifiant client et la clé secrète dans back/.env (modèle : back/.env.example)\n" +
   '\n' +
-  'Puis relancer : npm run dev -- france-travail --dry-run';
+  'Puis relancer : npm run import:france-travail -- --dry-run';
 
 export interface FranceTravailOptions {
   dryRun: boolean;
@@ -76,11 +76,15 @@ export async function runFranceTravail(options: FranceTravailOptions): Promise<v
     return;
   }
 
-  const supabase = createSupabase();
-  const rows = report.rows.map((row) => ({ ...row, importe_le: now.toISOString() }));
-  log(`Écriture dans ${TABLE} (upsert sur code_rome + region + bassin_emploi + annee)…`);
-  const written = await upsertInBatches(supabase, TABLE, rows, 'code_rome,region,bassin_emploi,annee', {
-    batchSize: BATCH_SIZE,
-  });
-  log(`  ${n(written)} lignes écrites. Import rejouable : relancer met à jour les lignes existantes.`);
+  const pool = createPool();
+  try {
+    const rows = report.rows.map((row) => ({ ...row, importe_le: now.toISOString() }));
+    log(`Écriture dans ${TABLE} (upsert sur code_rome + region + bassin_emploi + annee)…`);
+    const written = await upsertInBatches(pool, TABLE, rows, ['code_rome', 'region', 'bassin_emploi', 'annee'], {
+      batchSize: BATCH_SIZE,
+    });
+    log(`  ${n(written)} lignes écrites. Import rejouable : relancer met à jour les lignes existantes.`);
+  } finally {
+    await pool.end();
+  }
 }
