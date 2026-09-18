@@ -3,13 +3,15 @@ import { toPublicUser, type User } from '../types';
 import type { UserRepository } from '../users/repository';
 import { requireAuth } from './middleware';
 import { hashPassword, verifyPassword } from './password';
-import { loginSchema, registerSchema } from './schemas';
+import { changePasswordSchema, loginSchema, registerSchema } from './schemas';
 import { signToken } from './token';
 
 function session(user: User) {
   return {
     token: signToken({ sub: user.id, email: user.email, role: user.role }),
     user: toPublicUser(user),
+    // Le front redirige vers le changement de mot de passe à la première connexion d'une entreprise.
+    mustChangePassword: user.mustChangePassword,
   };
 }
 
@@ -37,6 +39,11 @@ export function createAuthRouter(users: UserRepository): Router {
       res.status(401).json({ error: 'Email ou mot de passe incorrect' });
       return;
     }
+    // Vérifié après le mot de passe : on ne révèle l'état du compte qu'à son propriétaire.
+    if (!user.isActive) {
+      res.status(403).json({ error: 'Compte désactivé' });
+      return;
+    }
     res.json(session(user));
   });
 
@@ -47,6 +54,20 @@ export function createAuthRouter(users: UserRepository): Router {
       return;
     }
     res.json({ user: toPublicUser(user) });
+  });
+
+  router.post('/change-password', requireAuth, async (req, res) => {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+    const user = await users.findById(req.user!.sub);
+    if (!user || !(await verifyPassword(user.passwordHash, currentPassword))) {
+      res.status(401).json({ error: 'Mot de passe actuel incorrect' });
+      return;
+    }
+    await users.update(user.id, {
+      passwordHash: await hashPassword(newPassword),
+      mustChangePassword: false,
+    });
+    res.status(204).end();
   });
 
   return router;

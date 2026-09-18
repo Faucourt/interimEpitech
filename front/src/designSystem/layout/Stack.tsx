@@ -1,0 +1,2 @@
+import type { ReactNode } from 'react'
+export function Stack({ children, gap = 'md', direction = 'vertical', className = '' }: { children: ReactNode; gap?: 'sm' | 'md' | 'lg'; direction?: 'vertical' | 'horizontal'; className?: string }) { const gaps = { sm: 'gap-2', md: 'gap-4', lg: 'gap-6' }; return <div className={`flex ${direction === 'vertical' ? 'flex-col' : 'flex-row flex-wrap'} ${gaps[gap]} ${className}`}>{children}</div> }

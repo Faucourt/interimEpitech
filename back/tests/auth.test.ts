@@ -1,15 +1,17 @@
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { signToken } from '../src/auth/token';
-import { createMemoryUserRepository } from '../src/users/memoryRepository';
+import { createTestApp, seedUser } from './helpers';
 
-const app = createApp(createMemoryUserRepository());
+const { app, repos } = createTestApp();
 
+// Les comptes entreprise ne s'inscrivent pas : ils sont créés par l'admin (voir missions.test.ts).
+// Ici on en seede un directement pour tester le login et le contrôle de rôle.
 const entreprise = {
   email: 'contact@acme.fr',
   password: 'motdepasse',
-  role: 'ENTREPRISE',
+  role: 'ENTREPRISE' as const,
   raisonSociale: 'ACME',
   siret: '12345678901234',
 };
@@ -25,6 +27,10 @@ const interimaire = {
 let tokenEntreprise = '';
 let tokenInterimaire = '';
 
+beforeAll(async () => {
+  await seedUser(repos, entreprise);
+});
+
 describe('GET /health', () => {
   it('répond ok', async () => {
     const res = await request(app).get('/health');
@@ -34,30 +40,30 @@ describe('GET /health', () => {
 });
 
 describe('POST /api/auth/register', () => {
-  it('inscrit une entreprise', async () => {
+  it("refuse l'inscription publique d'une entreprise", async () => {
     const res = await request(app).post('/api/auth/register').send(entreprise);
-    expect(res.status).toBe(201);
-    expect(res.body.user).toMatchObject({ email: entreprise.email, role: 'ENTREPRISE', raisonSociale: 'ACME' });
-    expect(res.body.user.passwordHash).toBeUndefined();
-    tokenEntreprise = res.body.token;
+    expect(res.status).toBe(400);
+    expect(res.body.details[0].message).toMatch(/créés par l'administrateur/);
   });
 
   it('inscrit un intérimaire', async () => {
     const res = await request(app).post('/api/auth/register').send(interimaire);
     expect(res.status).toBe(201);
     expect(res.body.user).toMatchObject({ role: 'INTERIMAIRE', prenom: 'Jean', nom: 'Dupont' });
+    expect(res.body.user.passwordHash).toBeUndefined();
+    expect(res.body.mustChangePassword).toBe(false);
     tokenInterimaire = res.body.token;
   });
 
   it('refuse un email déjà pris', async () => {
-    const res = await request(app).post('/api/auth/register').send(entreprise);
+    const res = await request(app).post('/api/auth/register').send(interimaire);
     expect(res.status).toBe(409);
   });
 
   it('refuse un corps invalide', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ email: 'pas-un-email', password: '123', role: 'ENTREPRISE' });
+      .send({ email: 'pas-un-email', password: '123' });
     expect(res.status).toBe(400);
     expect(res.body.details.length).toBeGreaterThan(0);
   });
@@ -71,6 +77,7 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTypeOf('string');
     expect(res.body.user.email).toBe(entreprise.email);
+    tokenEntreprise = res.body.token;
   });
 
   it('renvoie la même erreur 401 pour un mauvais mot de passe et pour un email inconnu', async () => {
@@ -131,9 +138,12 @@ describe('gestion des erreurs', () => {
 
   it("renvoie 500 sans exposer le détail d'une erreur interne", async () => {
     const broken = createApp({
-      ...createMemoryUserRepository(),
-      findByEmail: async () => {
-        throw new Error('connexion base perdue');
+      ...repos,
+      users: {
+        ...repos.users,
+        findByEmail: async () => {
+          throw new Error('connexion base perdue');
+        },
       },
     });
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});

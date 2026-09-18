@@ -1,0 +1,1264 @@
+{
+  "info": {
+    "name": "CleanMatch — API",
+    "description": "Scénario de démonstration complet de l'API CleanMatch, dans l'ordre.\n\n**Avant de lancer** : démarrer le back (`cd back && npm run dev`) et renseigner la variable `adminPassword` dans l'onglet Variables de la collection.\n\nLes jetons et identifiants se propagent automatiquement d'une requête à l'autre : il suffit de dérouler les dossiers dans l'ordre, ou de lancer le Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@cleanmatch.fr"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "description": "À renseigner — demander à l'équipe"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "entrepriseEmail",
+      "value": ""
+    },
+    {
+      "key": "entrepriseTempPassword",
+      "value": ""
+    },
+    {
+      "key": "entreprisePassword",
+      "value": "MotDePasseEntreprise2026"
+    },
+    {
+      "key": "entrepriseToken",
+      "value": ""
+    },
+    {
+      "key": "agentEmail",
+      "value": ""
+    },
+    {
+      "key": "agentPassword",
+      "value": "MotDePasseAgent2026"
+    },
+    {
+      "key": "agentToken",
+      "value": ""
+    },
+    {
+      "key": "missionId",
+      "value": ""
+    },
+    {
+      "key": "candidatureId",
+      "value": ""
+    },
+    {
+      "key": "competenceId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 — Santé",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Vérifie que le back répond avant de dérouler le scénario."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('API en ligne', () => pm.response.to.have.status(200));",
+                  "pm.test('statut ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 — Admin : créer une entreprise",
+      "item": [
+        {
+          "name": "Connexion admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Le compte admin est créé par seed en base, il ne s'inscrit pas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('connecté', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('adminToken', d.token);",
+                  "pm.test('rôle ADMIN', () => pm.expect(d.user.role).to.eql('ADMIN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer un compte entreprise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/entreprises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "entreprises"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"contact+{{$timestamp}}@propretech.fr\",\n  \"raisonSociale\": \"PropreTech Services\",\n  \"siret\": \"81234567800019\",\n  \"telephone\": \"0148120034\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Une entreprise ne s'inscrit jamais elle-même : l'admin crée le compte et transmet un mot de passe temporaire, à changer à la première connexion."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('créée', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('entrepriseEmail', d.user.email);",
+                  "pm.collectionVariables.set('entrepriseTempPassword', d.temporaryPassword);",
+                  "pm.test('mot de passe temporaire renvoyé une seule fois',",
+                  "  () => pm.expect(d.temporaryPassword).to.be.a('string').and.not.empty);",
+                  "pm.test('doit changer son mot de passe',",
+                  "  () => pm.expect(d.user.mustChangePassword).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 — Entreprise : mot de passe et mission",
+      "item": [
+        {
+          "name": "Connexion avec le mot de passe temporaire",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{entrepriseEmail}}\",\n  \"password\": \"{{entrepriseTempPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('connectée', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('entrepriseToken', d.token);",
+                  "pm.test('le front doit forcer le changement',",
+                  "  () => pm.expect(d.mustChangePassword).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Changer le mot de passe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{entrepriseTempPassword}}\",\n  \"newPassword\": \"{{entreprisePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('mot de passe changé (204 No Content)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reconnexion avec le nouveau mot de passe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{entrepriseEmail}}\",\n  \"password\": \"{{entreprisePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('connectée', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('entrepriseToken', d.token);",
+                  "pm.test('plus de changement imposé',",
+                  "  () => pm.expect(d.mustChangePassword).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publier une mission (Paris 12e, soirée)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intitule\": \"Agent de propreté — bureaux\",\n  \"typeNettoyage\": \"BUREAUX\",\n  \"description\": \"Nettoyage de bureaux en soirée, autolaveuse souhaitée.\",\n  \"motif\": \"Remplacement d'un salarié absent\",\n  \"dateDebut\": \"2026-10-01\",\n  \"dateFin\": \"2026-12-31\",\n  \"heureDebut\": \"18:00\",\n  \"heureFin\": \"22:00\",\n  \"jours\": [\n    \"LUNDI\",\n    \"MARDI\",\n    \"MERCREDI\",\n    \"JEUDI\",\n    \"VENDREDI\"\n  ],\n  \"creneau\": \"SOIREE\",\n  \"adresse\": \"12 rue de Reuilly\",\n  \"codePostal\": \"75012\",\n  \"ville\": \"Paris\",\n  \"competencesRequises\": [\n    \"nettoyage de bureaux\",\n    \"autolaveuse\"\n  ],\n  \"remuneration\": 13.5,\n  \"nbAgents\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "`motif` est une mention légale obligatoire, et la durée est plafonnée à 18 mois (Code du travail). La publication déclenche aussi la notification n8n."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('publiée', () => pm.response.to.have.status(201));",
+                  "const m = pm.response.json().mission;",
+                  "pm.collectionVariables.set('missionId', m.id);",
+                  "pm.test('statut OUVERTE', () => pm.expect(m.statut).to.eql('OUVERTE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refus : mission sans motif",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intitule\": \"Test sans motif\",\n  \"typeNettoyage\": \"BUREAUX\",\n  \"dateDebut\": \"2026-10-01\",\n  \"dateFin\": \"2026-10-31\",\n  \"codePostal\": \"75012\",\n  \"ville\": \"Paris\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Démontre le contrôle du Code du travail."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refusée : mention légale manquante', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mes missions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions",
+                "mine"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 — Intérimaire : profil et candidature",
+      "item": [
+        {
+          "name": "Inscription d'un agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"agent+{{$timestamp}}@example.com\",\n  \"password\": \"{{agentPassword}}\",\n  \"role\": \"INTERIMAIRE\",\n  \"prenom\": \"Amina\",\n  \"nom\": \"Diallo\",\n  \"telephone\": \"0612345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "L'agent s'inscrit librement, contrairement à l'entreprise."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('inscrit', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.collectionVariables.set('agentToken', d.token);",
+                  "pm.collectionVariables.set('agentEmail', d.user.email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refus : inscription publique d'une entreprise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"fraude+{{$timestamp}}@example.com\",\n  \"password\": \"MotDePasse123\",\n  \"role\": \"ENTREPRISE\",\n  \"prenom\": \"X\",\n  \"nom\": \"Y\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refusée : passage par l’admin obligatoire', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profil : Vincennes, soirée, bureaux",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profil"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"competences\": [\n    \"nettoyage de bureaux\",\n    \"autolaveuse\",\n    \"vitrerie\"\n  ],\n  \"typesNettoyage\": [\n    \"BUREAUX\"\n  ],\n  \"codePostal\": \"94300\",\n  \"ville\": \"Vincennes\",\n  \"rayonKm\": 15,\n  \"joursDisponibles\": [\n    \"LUNDI\",\n    \"MARDI\",\n    \"MERCREDI\",\n    \"JEUDI\",\n    \"VENDREDI\"\n  ],\n  \"creneaux\": [\n    \"SOIREE\"\n  ],\n  \"disponible\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Vincennes est à ~2 km de Paris 12e : le critère de localisation (25 pts) donne le maximum."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('enregistré', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajouter une expérience",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil/experiences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profil",
+                "experiences"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intitule\": \"Agent de propreté\",\n  \"typeNettoyage\": \"BUREAUX\",\n  \"entreprise\": \"Net Services\",\n  \"ville\": \"Paris\",\n  \"dateDebut\": \"2026-01-06\",\n  \"dateFin\": \"2026-06-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Alimente les 25 points « dernières missions » du score."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ajoutée', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Référentiel de compétences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/competences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "competences"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));",
+                  "const l = pm.response.json().competences || pm.response.json();",
+                  "const c = l.find(x => x.nom === 'autolaveuse') || l[0];",
+                  "if (c) pm.collectionVariables.set('competenceId', c.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Qualifier ses compétences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil/competences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profil",
+                "competences"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"competences\": [\n    {\n      \"competenceId\": \"{{competenceId}}\",\n      \"niveau\": \"EXPERT\",\n      \"anneesExperience\": 6\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Un EXPERT pèse plus qu'un DEBUTANT dans les 50 points de mots-clés."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('enregistrées', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missions recommandées (avec score)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions/recommandees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions",
+                "recommandees"
+              ]
+            },
+            "description": "Le cœur du produit : les missions triées par score de compatibilité sur 100."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));",
+                  "const reco = pm.response.json().recommandations;",
+                  "pm.test('recommandations renvoyées', () => pm.expect(reco).to.be.an('array'));",
+                  "pm.test('au moins une mission compatible', () => pm.expect(reco.length).to.be.above(0));",
+                  "pm.test('score total sur 100, avec le détail des 3 critères', () => {",
+                  "  reco.forEach(r => {",
+                  "    pm.expect(r.score.total).to.be.a('number').and.within(0, 100);",
+                  "    pm.expect(r.score.details).to.be.an('object');",
+                  "  });",
+                  "});",
+                  "const r0 = reco[0];",
+                  "console.log('Meilleur score :', r0.score.total + '/100', '|', JSON.stringify(r0.score.details));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidater",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions/{{missionId}}/candidatures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions",
+                "{{missionId}}",
+                "candidatures"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('candidature envoyée', () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json().candidature || pm.response.json();",
+                  "pm.collectionVariables.set('candidatureId', c.id);",
+                  "pm.test('score figé', () => pm.expect(c.score).to.be.a('number'));",
+                  "console.log('Score figé :', c.score);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mes candidatures",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidatures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "candidatures"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 — Entreprise : traiter la candidature",
+      "item": [
+        {
+          "name": "Candidats compatibles, triés par score",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions/{{missionId}}/candidats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions",
+                "{{missionId}}",
+                "candidats"
+              ]
+            },
+            "description": "Les agents indisponibles sur les dates ou créneaux sont écartés par le filtre, ils n'apparaissent pas ici."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json().candidats;",
+                  "pm.test('liste de candidats', () => pm.expect(c).to.be.an('array'));",
+                  "pm.test('triés par score décroissant', () => {",
+                  "  const s = c.map(x => x.score.total);",
+                  "  pm.expect(s).to.eql([...s].sort((a, b) => b - a));",
+                  "});",
+                  "console.log('Candidats :', c.map(x => x.score.total + '/100').join(', '));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidatures reçues",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidatures?missionId={{missionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "candidatures"
+              ],
+              "query": [
+                {
+                  "key": "missionId",
+                  "value": "{{missionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refus sans justificatif (rejeté)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidatures/{{candidatureId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "candidatures",
+                "{{candidatureId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"REFUSEE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Règle métier : un refus doit toujours être motivé."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refus non motivé rejeté', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accepter la candidature",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{entrepriseToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidatures/{{candidatureId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "candidatures",
+                "{{candidatureId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statut\": \"ACCEPTEE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Le nombre d'agents recherchés étant atteint, la mission passe à POURVUE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('acceptée', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "console.log('Statut mission :', JSON.stringify(d).slice(0, 300));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 — Admin : supervision",
+      "item": [
+        {
+          "name": "Logs de matching (MongoDB)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/logs-matching?missionId={{missionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "logs-matching"
+              ],
+              "query": [
+                {
+                  "key": "missionId",
+                  "value": "{{missionId}}"
+                }
+              ]
+            },
+            "description": "Base non relationnelle : chaque score calculé y est journalisé, conservé 6 mois (index TTL)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tendances marché (France Travail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tendances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "tendances"
+              ]
+            },
+            "description": "Alimenté par le CLI d'import des données publiques."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accès refusé à un non-admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{agentToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tendances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "tendances"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 pour un intérimaire', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 — Pages publiques",
+      "item": [
+        {
+          "name": "Liste des missions ouvertes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions"
+              ]
+            },
+            "description": "Page publique, indexable : c'est la base du SEO on-page."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Détail d'une mission",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/missions/{{missionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "missions",
+                "{{missionId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ok', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sans jeton : accès refusé",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profil"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans authentification', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
